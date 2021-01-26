@@ -62,7 +62,9 @@ try:
             vim.eval('a:cmd'),
             shell = True,
             universal_newlines = True,
-            stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+            stdout=open(os.devnull, 'w'),
+            stderr=subprocess.STDOUT,
+            cwd=vim.eval('b:livepreview_buf_data["tmp_root_dir"]'))
 
 except:
     pass
@@ -76,16 +78,10 @@ function! s:Compile()
         return
     endif
 
-    " Change directory to handle properly sourced files with \input and bib
-    " TODO: get rid of lcd
-    execute 'lcd ' . b:livepreview_buf_data['root_dir']
-
     " Write the current buffer in a temporary file
     silent exec 'write! ' . b:livepreview_buf_data['tmp_src_file']
 
     call s:RunInBackground(b:livepreview_buf_data['run_cmd'])
-
-    lcd -
 endfunction
 
 function! s:StartPreview(...)
@@ -170,6 +166,7 @@ EEOOFF
     " Escape pathnames
     let l:root_file = fnameescape(l:root_file)
     let l:tmp_root_dir = fnameescape(l:tmp_root_dir)
+    let b:livepreview_buf_data['tmp_root_dir'] = l:tmp_root_dir
     let b:livepreview_buf_data['tmp_dir'] = fnameescape(b:livepreview_buf_data['tmp_dir'])
     let b:livepreview_buf_data['tmp_src_file'] = fnameescape(b:livepreview_buf_data['tmp_src_file'])
 
@@ -180,7 +177,7 @@ EEOOFF
     else
         let b:livepreview_buf_data['root_dir'] = fnamemodify(l:root_file, ':p:h')
     endif
-    execute 'lcd ' . b:livepreview_buf_data['root_dir']
+    execute 'lcd ' . l:tmp_root_dir
 
     " Write the current buffer in a temporary file
     silent exec 'write! ' . b:livepreview_buf_data['tmp_src_file']
@@ -198,9 +195,7 @@ EEOOFF
                 \ s:engine . ' ' .
                 \       '-shell-escape ' .
                 \       '-interaction=nonstopmode ' .
-                \       '-output-directory=' . l:tmp_root_dir . ' ' .
                 \       l:root_file
-                " lcd can be avoided thanks to root_dir in TEXINPUTS
 
     silent call system(b:livepreview_buf_data['run_cmd'])
     if v:shell_error != 0
@@ -219,7 +214,7 @@ EEOOFF
         endfor
 
         if s:use_biber
-            let s:bibexec = 'biber --input-directory=' . l:tmp_root_dir . '--output-directory=' . l:tmp_root_dir . ' ' . l:root_file
+            let s:bibexec = 'biber ' . l:root_file
         else
             " The alternative to this pushing and popping is to write
             " temporary files to a `.tmp` folder in the current directory and
